@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
     <script>
     (function() {
         document.addEventListener('contextmenu', function(e) {
@@ -37,302 +36,290 @@
     })();
     </script>
 
-
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SISTEMA SEMS - RIA Dashboard v5</title>
+    <title>SISTEMA SEMS - Dashboard Ejecutivo</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        :root { --negro: #0f172a; --tierra: #78350f; --beige: #f5f5f4; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--beige); color: var(--negro); }
-        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(0,0,0,0.1); }
-        .stat-card { border-left: 4px solid var(--tierra); }
-        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); z-index: 999; align-items: center; justify-content: center; color: white; flex-direction: column; }
+        
+        :root {
+            --negro: #0f172a;
+            --tierra: #78350f;
+            --beige: #f5f5f4;
+            --gris-base: #e2e8f0;
+            --crema: #fffbeb;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--beige); 
+            color: var(--negro); 
+        }
+        
+        .kpi-card { 
+            background: white; 
+            border-top: 4px solid var(--tierra); 
+            border-radius: 0.25rem; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        }
+        
+        .badge-riesgo {
+            background-color: var(--negro);
+            color: white;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        #loadingOverlay { 
+            display: none; 
+            background: rgba(15, 23, 42, 0.9); 
+            z-index: 9999; 
+            position: fixed; 
+            inset: 0; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            color: white; 
+        }
+
+        select {
+            background-color: white;
+            border: 1px solid var(--gris-base);
+            border-radius: 4px;
+        }
     </style>
 </head>
-<body class="min-h-screen pb-12">
+<body>
 
-    <div id="loader" class="loading-overlay font-bold">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-amber-500 mb-4"></div>
-        <span class="text-xl tracking-widest uppercase" id="loader-text">Procesando Datos Académicos...</span>
+    <div id="loadingOverlay">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-amber-500 mb-4"></div>
+        <p id="loadingText" class="text-xs font-bold tracking-[0.3em] uppercase">Sincronizando datos...</p>
     </div>
 
-    <header class="bg-[#0f172a] text-white p-6 shadow-2xl mb-6">
-        <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-                <h1 class="text-3xl font-extrabold tracking-tighter uppercase">Sistema SEMS <span class="text-amber-500 italic">RIA</span></h1>
-                <p class="text-[10px] tracking-[0.4em] text-stone-400">PLANTILLA DE CONTROL ACADÉMICO PROFESIONAL</p>
-            </div>
-            <div class="flex flex-wrap gap-2 justify-center">
-                <input type="file" id="fileInput" class="hidden" accept=".csv, .xlsx">
-                <button onclick="document.getElementById('fileInput').click()" class="bg-stone-700 hover:bg-stone-600 px-4 py-2 rounded-lg text-xs font-bold transition-all">ACTUALIZAR EXCEL</button>
-                <button onclick="exportToExcel()" class="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-lg text-xs font-bold transition-all">EXCEL</button>
-                <button onclick="exportToPDF()" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded-lg text-xs font-bold transition-all">PDF ELEGANTE</button>
-                <button onclick="clearDatabase()" class="bg-red-900/40 hover:bg-red-800 px-4 py-2 rounded-lg text-xs font-bold transition-all border border-red-700/50">LIMPIAR CACHÉ</button>
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-[1600px] mx-auto px-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="glass p-5 rounded-2xl stat-card shadow-sm"><p class="text-[10px] font-bold text-stone-500 uppercase">Alumnos Únicos</p><h2 id="stat-alumnos" class="text-3xl font-black text-slate-800">0</h2></div>
-            <div class="glass p-5 rounded-2xl stat-card shadow-sm"><p class="text-[10px] font-bold text-stone-500 uppercase">Registros en Vista</p><h2 id="stat-registros" class="text-3xl font-black text-slate-800">0</h2></div>
-            <div class="glass p-5 rounded-2xl stat-card shadow-sm"><p class="text-[10px] font-bold text-stone-500 uppercase">Planteles</p><h2 id="stat-planteles" class="text-3xl font-black text-slate-800">0</h2></div>
-            <div class="glass p-5 rounded-2xl stat-card shadow-sm"><p class="text-[10px] font-bold text-stone-500 uppercase">Promedio Global</p><h2 id="stat-promedio" class="text-3xl font-black text-emerald-700">0.0</h2></div>
-        </div>
-
-        <section class="glass rounded-2xl p-6 mb-6 shadow-sm border border-stone-200">
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">PLANTEL</label><select id="f-plantel" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none"></select></div>
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">SEMESTRE</label><select id="f-semestre" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none"></select></div>
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">DOCENTE</label><select id="f-docente" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none"></select></div>
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">TURNO</label><select id="f-turno" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none"></select></div>
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">TIPO ALUMNO</label><select id="f-tipo" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none"></select></div>
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">SECTOR</label><select id="f-sector" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none"></select></div>
-                <div><label class="block text-[9px] font-bold text-stone-400 mb-1">SEMÁFORO</label>
-                    <select id="f-semaforo" onchange="applyFilters()" class="w-full bg-stone-50 border p-2 rounded-lg text-xs font-bold outline-none">
-                        <option value="ALL">TODOS</option><option value="ROJO">🔴 0-4</option><option value="AMARILLO">🟡 4.1-6</option><option value="NARANJA">🟠 6.1-8</option><option value="VERDE">🟢 +8</option>
-                    </select>
+    <nav class="bg-slate-950 text-white p-6 shadow-2xl border-b-4 border-amber-900">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="h-10 w-1 bg-amber-700"></div>
+                <div>
+                    <h1 class="text-xl font-light tracking-widest uppercase">Sistema de Análisis <span class="font-bold">COBAED</span></h1>
+                    <p class="text-[9px] text-slate-400 tracking-tighter">CONTROL ACADÉMICO ESTRATÉGICO</p>
                 </div>
             </div>
-        </section>
+            <button onclick="clearDatabase()" class="text-stone-500 hover:text-red-400 text-[10px] uppercase font-bold">Reiniciar Sistema</button>
+        </div>
+    </nav>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="glass p-4 rounded-2xl h-60" id="chart-genero"></div>
-            <div class="glass p-4 rounded-2xl h-60" id="chart-turno"></div>
-            <div class="glass p-4 rounded-2xl h-60" id="chart-estatus"></div>
-            <div class="glass p-4 rounded-2xl h-60" id="chart-tipo"></div>
-            <div class="glass p-4 rounded-2xl h-60 md:col-span-2" id="chart-rangos"></div>
-            <div class="glass p-4 rounded-2xl h-60 md:col-span-2" id="chart-ranking"></div>
+    <main class="container mx-auto p-4 lg:p-8">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <div class="kpi-card p-6"><p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Población Estudiantil</p><h2 id="kpi-alumnos" class="text-3xl font-bold">0</h2></div>
+            <div class="kpi-card p-6">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase">Muestra Filtrada</p>
+                    <span id="kpi-pct-riesgo" class="badge-riesgo">0% RIESGO</span>
+                </div>
+                <h2 id="kpi-registros" class="text-3xl font-bold">0</h2>
+            </div>
+            <div class="kpi-card p-6"><p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Centros Educativos</p><h2 id="kpi-planteles" class="text-3xl font-bold">0</h2></div>
+            <div class="kpi-card p-6"><p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Promedio General</p><h2 id="kpi-promedio" class="text-3xl font-bold text-amber-900">0.0</h2></div>
+            <div class="kpi-card p-6"><p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Universo Total</p><h2 id="kpi-total-global" class="text-3xl font-bold text-slate-300">0</h2></div>
         </div>
 
-        <div class="glass rounded-2xl overflow-hidden shadow-sm border border-stone-200">
-            <div class="overflow-y-auto max-h-[600px]">
-                <table class="w-full text-left text-[11px]" id="mainTable">
-                    <thead class="bg-slate-900 text-white sticky top-0 z-10">
-                        <tr>
-                            <th class="p-3 text-center">REGISTROS</th>
-                            <th class="p-3">PLANTEL</th>
-                            <th class="p-3 text-center">SEM.</th>
-                            <th class="p-3">TURNO</th>
-                            <th class="p-3 text-center">GP</th>
-                            <th class="p-3">ALUMNO</th>
-                            <th class="p-3">MATERIA</th>
-                            <th class="p-3 text-center">PROM.</th>
-                            <th class="p-3 text-center">STATUS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody" class="divide-y divide-stone-100 italic"></tbody>
-                </table>
-            </div>
+        <div class="bg-white p-6 rounded shadow-sm border border-stone-200 grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-4 mb-8">
+            <select id="f-plantel" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-semestre" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-materia" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-docente" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-turno-filter" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-nucleo" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-area" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-tipo" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-sector" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+            <select id="f-semaforo" onchange="applyFilters()" class="text-[10px] p-2 rounded font-bold border-amber-200 bg-crema">
+                <option value="ALL">SEMÁFORO (TODOS)</option>
+                <option value="ROJO">🔴 CRÍTICO (0 - 4.0)</option>
+                <option value="AMARILLO">🟡 RIESGO (4.1 - 6.0)</option>
+                <option value="NARANJA">🟠 REGULAR (6.1 - 8.0)</option>
+                <option value="VERDE">🟢 ÓPTIMO (> 8.0)</option>
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="bg-white p-4 rounded shadow-sm border border-stone-100"><div id="chart-semaforo-dist" class="h-72"></div></div>
+            <div class="bg-white p-4 rounded shadow-sm border border-stone-100"><div id="chart-genero" class="h-72"></div></div>
+            <div class="bg-white p-4 rounded shadow-sm border border-stone-100"><div id="chart-turno" class="h-72"></div></div>
+            <div class="bg-white p-4 rounded shadow-sm border border-stone-100"><div id="chart-estatus" class="h-72"></div></div>
         </div>
     </main>
 
     <script>
-        const GITHUB_DATA_URL = 'RIACarga.xlsx'; // Ruta relativa al archivo en GitHub/Servidor
-        const DB_NAME = 'SemsRia_FinalV5';
-        const STORE_NAME = 'data';
-        let db, dataGlobal = [], dataFiltered = [];
+        const DB_NAME = 'SemsPremiumDB';
+        const STORE_NAME = 'records';
+        const FILE_ID = '1NI7hAhBDk3M1jRr4-d70Stoo3EOpqPVl';
+        let db;
+        let dataGlobal = [];
+        let currentFilteredData = [];
 
-        const initDB = () => new Promise(res => {
-            const req = indexedDB.open(DB_NAME, 1);
-            req.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { autoIncrement: true });
-            req.onsuccess = (e) => { db = e.target.result; res(); };
-        });
+        const PALETA = { negro: '#0f172a', tierra: '#78350f', beige: '#f5f5f4', crema: '#fffbeb', gris: '#94a3b8' };
 
-        // Función central para procesar datos (usada por FileInput y Fetch)
-        async function processAndSaveData(arrayBuffer) {
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-            const processed = json.map(r => ({
-                Plantel: r.plantel || 'N/A',
-                Semestre: r.semestre || '-',
-                Turno: r.turno == 1 ? 'Matutino' : 'Vespertino',
-                Grupo: r.grupo || '-',
-                Alumno: r.nombre || 'SIN NOMBRE',
-                Materia: r.materia || 'N/A',
-                Docente: r.nombre_doc || 'N/A',
-                Promedio: parseFloat(r.prom_uni) || 0,
-                Genero: r.genero == 1 ? 'Hombre' : 'Mujer',
-                Estatus: r.estatus || 'I',
-                Tipo: r.tipo_alumno || 'N',
-                Semaforo: getSemaforoTag(parseFloat(r.prom_uni) || 0)
-            }));
-
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            await store.clear();
-            processed.forEach(item => store.add(item));
-            
-            return new Promise(resolve => {
-                tx.oncomplete = () => {
-                    document.getElementById('loader').style.display = 'none';
-                    location.reload();
-                    resolve();
-                };
+        const initDB = () => {
+            return new Promise((resolve) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                request.onsuccess = (e) => { db = e.target.result; resolve(); };
             });
-        }
+        };
 
-        // Carga automática desde GitHub al iniciar
-        async function loadDataFromSource() {
+        async function fetchFromDrive() {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
             try {
-                document.getElementById('loader').style.display = 'flex';
-                document.getElementById('loader-text').innerText = "Sincronizando con GitHub...";
-                
-                const response = await fetch(GITHUB_DATA_URL);
-                if (!response.ok) throw new Error("No se encontró el archivo RIACarga.xlsx");
-                
-                const buffer = await response.arrayBuffer();
-                await processAndSaveData(buffer);
-            } catch (err) {
-                console.error("Error cargando datos automáticos:", err);
-                document.getElementById('loader').style.display = 'none';
+                const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=xlsx`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Acceso denegado a Drive.");
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                saveDataToDB(json);
+            } catch (error) {
+                overlay.style.display = 'none';
             }
         }
 
-        document.getElementById('fileInput').onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            document.getElementById('loader').style.display = 'flex';
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                await processAndSaveData(evt.target.result);
+        const saveDataToDB = async (rawData) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            await store.clear();
+            rawData.forEach(item => store.add(item));
+            tx.oncomplete = () => {
+                dataGlobal = rawData;
+                setupFilters(); 
+                applyFilters();
+                document.getElementById('loadingOverlay').style.display = 'none';
             };
-            reader.readAsArrayBuffer(file);
-        };
-
-        const getSemaforoTag = (p) => {
-            if (p <= 4) return 'ROJO';
-            if (p <= 6) return 'AMARILLO';
-            if (p <= 8) return 'NARANJA';
-            return 'VERDE';
-        };
-
-        const renderCharts = (items) => {
-            const conf = { responsive: true, margin: { t: 40, b: 20, l: 20, r: 20 } };
-            const countBy = (field) => items.reduce((acc, obj) => { acc[obj[field]] = (acc[obj[field]] || 0) + 1; return acc; }, {});
-
-            Plotly.newPlot('chart-genero', [{ values: Object.values(countBy('Genero')), labels: Object.keys(countBy('Genero')), type: 'pie', marker:{colors:['#0f172a','#78350f']} }], { title: 'Género', ...conf });
-            Plotly.newPlot('chart-turno', [{ values: Object.values(countBy('Turno')), labels: Object.keys(countBy('Turno')), type: 'pie', hole: .4 }], { title: 'Turno', ...conf });
-            Plotly.newPlot('chart-estatus', [{ x: Object.keys(countBy('Estatus')), y: Object.values(countBy('Estatus')), type: 'bar', marker:{color:'#94a3b8'} }], { title: 'Estatus', ...conf });
-            Plotly.newPlot('chart-tipo', [{ x: Object.keys(countBy('Tipo')), y: Object.values(countBy('Tipo')), type: 'bar', marker:{color:'#fbbf24'} }], { title: 'Tipo Alumno', ...conf });
-            
-            const plantelesAvg = {};
-            items.forEach(i => { if(!plantelesAvg[i.Plantel]) plantelesAvg[i.Plantel] = { sum:0, ct:0 }; plantelesAvg[i.Plantel].sum += i.Promedio; plantelesAvg[i.Plantel].ct++; });
-            const ranking = Object.keys(plantelesAvg).map(k => ({ p: k, avg: plantelesAvg[k].sum / plantelesAvg[k].ct })).sort((a,b)=>b.avg - a.avg).slice(0, 10);
-            Plotly.newPlot('chart-ranking', [{ y: ranking.map(x=>x.p), x: ranking.map(x=>x.avg), type: 'bar', orientation: 'h', marker:{color:'#065f46'} }], { title: 'Ranking Planteles', ...conf });
-
-            const r = { '0-4': 0, '4.1-6': 0, '6.1-8': 0, '>8': 0 };
-            items.forEach(i => { if(i.Promedio <= 4) r['0-4']++; else if(i.Promedio <= 6) r['4.1-6']++; else if(i.Promedio <= 8) r['6.1-8']++; else r['>8']++; });
-            Plotly.newPlot('chart-rangos', [{ x: Object.keys(r), y: Object.values(r), type: 'bar', marker:{color:'#78350f'} }], { title: 'Rangos Promedio', ...conf });
-        };
-
-        const fillSelect = (id, vals) => {
-            const s = document.getElementById(id);
-            s.innerHTML = '<option value="ALL">TODOS</option>' + vals.map(v => `<option value="${v}">${v}</option>`).join('');
         };
 
         const setupFilters = () => {
-            const getU = (f) => [...new Set(dataGlobal.map(d => d[f]))].sort();
-            fillSelect('f-plantel', getU('Plantel'));
-            fillSelect('f-semestre', getU('Semestre'));
-            fillSelect('f-docente', getU('Docente'));
-            fillSelect('f-turno', getU('Turno'));
-            fillSelect('f-tipo', getU('Tipo'));
-            fillSelect('f-sector', getU('Genero'));
+            const fields = {
+                'f-plantel':'plantel', 'f-semestre':'semestre', 'f-materia':'materia', 
+                'f-docente':'nombre_doc', 'f-turno-filter':'turno', 'f-nucleo':'NUCLEO', 
+                'f-area':'Área de conocimiento', 'f-tipo':'TIPO', 'f-sector':'SECTOR'
+            };
+            Object.keys(fields).forEach(id => {
+                const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(Boolean).sort();
+                let label = id.replace('f-', '').replace('-filter','').toUpperCase();
+                document.getElementById(id).innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join('');
+            });
         };
 
         const applyFilters = () => {
-            const selectors = ['f-plantel','f-semestre','f-docente','f-turno','f-tipo','f-sector','f-semaforo'].map(id => document.getElementById(id).value);
-            dataFiltered = dataGlobal.filter(d => 
-                (selectors[0] === 'ALL' || d.Plantel === selectors[0]) &&
-                (selectors[1] === 'ALL' || d.Semestre == selectors[1]) &&
-                (selectors[2] === 'ALL' || d.Docente === selectors[2]) &&
-                (selectors[3] === 'ALL' || d.Turno === selectors[3]) &&
-                (selectors[4] === 'ALL' || d.Tipo === selectors[4]) &&
-                (selectors[5] === 'ALL' || d.Genero === selectors[5]) &&
-                (selectors[6] === 'ALL' || d.Semaforo === selectors[6])
-            );
-            renderTable(dataFiltered);
-            updateStats(dataFiltered);
-            renderCharts(dataFiltered);
-        };
+            const f = {
+                p: document.getElementById('f-plantel').value,
+                s: document.getElementById('f-semestre').value,
+                m: document.getElementById('f-materia').value,
+                d: document.getElementById('f-docente').value,
+                tr: document.getElementById('f-turno-filter').value,
+                n: document.getElementById('f-nucleo').value,
+                a: document.getElementById('f-area').value,
+                t: document.getElementById('f-tipo').value,
+                sec: document.getElementById('f-sector').value,
+                sema: document.getElementById('f-semaforo').value
+            };
 
-        const updateStats = (items) => {
-            document.getElementById('stat-alumnos').innerText = [...new Set(items.map(i=>i.Alumno))].length;
-            document.getElementById('stat-registros').innerText = items.length;
-            document.getElementById('stat-planteles').innerText = [...new Set(items.map(i=>i.Plantel))].length;
-            const avg = items.reduce((acc, curr) => acc + curr.Promedio, 0) / (items.length || 1);
-            document.getElementById('stat-promedio').innerText = avg.toFixed(1);
-        };
-
-        const renderTable = (items) => {
-            document.getElementById('tableBody').innerHTML = items.slice(0, 800).map((d, i) => `
-                <tr class="hover:bg-white transition-colors">
-                    <td class="p-3 text-center font-black text-stone-300 border-r">${i+1}</td>
-                    <td class="p-3 font-bold">${d.Plantel}</td>
-                    <td class="p-3 text-center">${d.Semestre}</td>
-                    <td class="p-3 text-[10px]">${d.Turno}</td>
-                    <td class="p-3 text-center font-bold text-amber-800">${d.Grupo}</td>
-                    <td class="p-3 font-semibold">${d.Alumno}</td>
-                    <td class="p-3 text-stone-500">${d.Materia}</td>
-                    <td class="p-3 text-center font-black ${d.Promedio < 6 ? 'text-red-600':'text-emerald-700'}">${d.Promedio.toFixed(1)}</td>
-                    <td class="p-3 text-center">
-                        <div class="inline-block w-3 h-3 rounded-full ${d.Semaforo === 'ROJO' ? 'bg-red-500' : d.Semaforo === 'AMARILLO' ? 'bg-yellow-400' : d.Semaforo === 'NARANJA' ? 'bg-orange-500' : 'bg-emerald-500'}"></div>
-                    </td>
-                </tr>
-            `).join('');
-        };
-
-        function exportToExcel() {
-            const worksheet = XLSX.utils.json_to_sheet(dataFiltered);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte RIA");
-            XLSX.writeFile(workbook, "Reporte_RIA_Filtrado.xlsx");
-        }
-
-        function exportToPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('l', 'mm', 'a4');
-            doc.setFontSize(18);
-            doc.setTextColor(15, 23, 42);
-            doc.text("REPORTE ACADÉMICO RIA - SISTEMA SEMS", 14, 20);
-            doc.setFontSize(10);
-            doc.text(`Registros: ${dataFiltered.length} | Promedio: ${document.getElementById('stat-promedio').innerText}`, 14, 28);
-            const tableRows = dataFiltered.slice(0, 50).map((d, i) => [
-                i+1, d.Plantel, d.Semestre, d.Turno, d.Grupo, d.Alumno, d.Materia, d.Promedio.toFixed(1), d.Semaforo
-            ]);
-            doc.autoTable({
-                head: [['N°', 'Plantel', 'Sem', 'Turno', 'Gp', 'Alumno', 'Materia', 'Prom', 'Semaforo']],
-                body: tableRows,
-                startY: 35,
-                theme: 'striped',
-                headStyles: { fillBlue: [15, 23, 42], fontSize: 8 },
-                styles: { fontSize: 7 }
+            currentFilteredData = dataGlobal.filter(d => {
+                const pass = (f.p === 'ALL' || d.plantel == f.p) && 
+                             (f.s === 'ALL' || d.semestre == f.s) && 
+                             (f.m === 'ALL' || d.materia == f.m) && 
+                             (f.d === 'ALL' || d.nombre_doc == f.d) && 
+                             (f.tr === 'ALL' || d.turno == f.tr) &&
+                             (f.n === 'ALL' || d.NUCLEO == f.n) && 
+                             (f.a === 'ALL' || d['Área de conocimiento'] == f.a) && 
+                             (f.t === 'ALL' || d.TIPO == f.t) && 
+                             (f.sec === 'ALL' || d.SECTOR == f.sec);
+                
+                if (!pass) return false;
+                if (f.sema === 'ALL') return true;
+                const v = parseFloat(d.cal_1) || 0;
+                if (f.sema === 'ROJO') return v <= 4.0;
+                if (f.sema === 'AMARILLO') return v > 4.0 && v <= 6.0;
+                if (f.sema === 'NARANJA') return v > 6.0 && v <= 8.0;
+                if (f.sema === 'VERDE') return v > 8.0;
+                return true;
             });
-            doc.save("Reporte_Profesional_RIA.pdf");
-        }
 
-        const clearDatabase = () => { if(confirm("¿Limpiar base de datos local? Esto forzará una recarga desde el archivo del servidor.")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } };
+            updateKPIs(currentFilteredData);
+            updateCharts(currentFilteredData);
+        };
+
+        const updateKPIs = (data) => {
+            const totalFiltrados = data.length;
+            const registrosRiesgo = data.filter(d => (parseFloat(d.cal_1) || 0) < 6.0).length;
+            const porcentajeRiesgo = totalFiltrados > 0 ? ((registrosRiesgo / totalFiltrados) * 100).toFixed(1) : "0.0";
+
+            document.getElementById('kpi-alumnos').innerText = new Set(data.map(d => d.matricula)).size.toLocaleString();
+            document.getElementById('kpi-registros').innerText = totalFiltrados.toLocaleString();
+            document.getElementById('kpi-pct-riesgo').innerText = `${porcentajeRiesgo}% RIESGO ACADÉMICO`;
+            document.getElementById('kpi-total-global').innerText = dataGlobal.length.toLocaleString();
+            document.getElementById('kpi-planteles').innerText = new Set(data.map(d => d.plantel)).size;
+            const sum = data.reduce((acc, curr) => acc + (parseFloat(curr.cal_1) || 0), 0);
+            document.getElementById('kpi-promedio').innerText = (sum / (totalFiltrados || 1)).toFixed(1);
+        };
+
+        const updateCharts = (data) => {
+            const config = { responsive: true, displayModeBar: false };
+            const layoutBase = { 
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', 
+                font: { size: 10, family: 'Inter', color: PALETA.negro }, 
+                margin: { t: 40, b: 60, l: 40, r: 20 } 
+            };
+            const getCounts = (f) => { const c = {}; data.forEach(d => c[d[f]] = (c[d[f]] || 0) + 1); return c; };
+
+            const total = data.length || 1;
+            const dist = {"0-4":0, "4.1-6":0, "6.1-8":0, "> 8":0};
+            data.forEach(d => {
+                const v = parseFloat(d.cal_1) || 0;
+                if (v <= 4.0) dist["0-4"]++; else if (v <= 6.0) dist["4.1-6"]++; else if (v <= 8.0) dist["6.1-8"]++; else dist["> 8"]++;
+            });
+            const pctDist = Object.values(dist).map(v => ((v/total)*100).toFixed(1));
+            Plotly.newPlot('chart-semaforo-dist', [{
+                x: Object.keys(dist), y: pctDist, type: 'bar', text: pctDist.map(v=>v+'%'), textposition: 'auto',
+                marker: {color: ['#ef4444', '#facc15', '#fb923c', '#22c55e']}
+            }], { ...layoutBase, title: 'DISTRIBUCIÓN %' }, config);
+
+            Plotly.newPlot('chart-genero', [{ 
+                values: Object.values(getCounts('genero')), labels: Object.keys(getCounts('genero')), 
+                type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris] }
+            }], { ...layoutBase, title: 'GÉNERO' }, config);
+
+            Plotly.newPlot('chart-turno', [{ 
+                x: Object.keys(getCounts('turno')), y: Object.values(getCounts('turno')), 
+                type: 'bar', marker: {color: PALETA.tierra} 
+            }], { ...layoutBase, title: 'TURNO' }, config);
+
+            Plotly.newPlot('chart-estatus', [{ 
+                values: Object.values(getCounts('estatus')), labels: Object.keys(getCounts('estatus')), 
+                type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra, PALETA.gris] }
+            }], { ...layoutBase, title: 'ESTATUS' }, config);
+        };
+
+        const clearDatabase = () => { if(confirm("¿Borrar datos locales y reiniciar?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } };
 
         window.onload = async () => {
             await initDB();
-            db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll().onsuccess = (e) => {
-                dataGlobal = e.target.result;
-                if (dataGlobal.length > 0) { 
+            const tx = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
+            tx.onsuccess = (e) => {
+                if (e.target.result.length > 0) { 
+                    dataGlobal = e.target.result; 
                     setupFilters(); 
                     applyFilters(); 
                 } else {
-                    // Si no hay datos en IndexedDB, intentamos cargar el archivo automáticamente
-                    loadDataFromSource();
+                    fetchFromDrive();
                 }
             };
         };
